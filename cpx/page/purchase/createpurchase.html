@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+	<title>采购-我的采购单</title>
+    <link href="<?php echo $data['staticFileRoot']; ?>/static/lib/bootstrap/bootstrap.css?v=<?php echo $data['staticFileVer']; ?>" type="text/css" rel="stylesheet">
+    <link href="<?php echo $data['staticFileRoot']; ?>/static/lib/global/global.css?v=<?php echo $data['staticFileVer']; ?>" type="text/css" rel="stylesheet">
+    <!-- 引用 html5shim 文件 -->
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="../../lib/global/html5Shim.js"></script>
+    <![endif]-->
+    <link rel="stylesheet" type="text/css" href="<?php echo $data['staticFileRoot']; ?>/static/modules/purchase/createpurchase/createpurchase.css?v=<?php echo $data['staticFileVer']; ?>">
+    <?php include(TEMPLATE_DIR.'home/configpath/configpath.tpl'); ?>
+</head>
+<body>
+<?php include(TEMPLATE_DIR.'home/header/header.html'); ?>
+    <div class="cpx-container ux-container">
+        <?php include(TEMPLATE_DIR.'home/leftnav/left-nav.html') ?>
+        <div class="cpx-right-container">
+            <div class="nav-crumbs-control">
+                <ul class="crumbs">
+                    <li class="crumbs-icon"></li>
+                    <li class="crumbs-txt font-888">采购</li>
+                    <li class="crumbs-crum font-888"><span>></span><span>></span></li>
+                    <li class="crumbs-txt"><a class="font-888" href="/web/expense/mypurchase">采购单</a></li>
+                    <li class="crumbs-crum font-888"><span>></span><span>></span></li>
+                    <li class="crumbs-txt font-bee">我的采购</li>
+                </ul>       
+            </div>
+            <div class="right-content-main">
+                <div class="cpx-box cpx-createpurchase-box">
+                    <form id="createPurchaseForm">
+                    <div class="cpx-box-header">
+                        <button type="button" id="subApprove" class="btn btn-default right-btn subApprove">提交审批</button>
+                        <div id="approvePersonDiv" class="select-control approve-person-select">
+                            <input type="hidden" value="" id="approvePerson" name="approvePerson" data-msg="请选择审批人"/>
+                            <span class="select-txt">审批人</span>
+                            <i class="select-icon glyphicon glyphicon-chevron-down"></i>
+                            <ul>
+                                <?php foreach($data['approverList'] as $v){ ?>
+                                <li><a href="javascript:;" selectid="<?php echo $v['userId'];?>"><?php echo $v['nickname'];?></a></li>
+                                <?php }?>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="cpx-search-form">
+                        <div class="cpx-form approve-search-form">
+                            <div class="cpx-search-info">
+                                <div class="form-group control-group">
+                                    <label class="control-label">采购部门</label>
+                                    <div class="controls">
+                                        <div class="control">
+                                            <div id="purchaseDepartmentDiv" class="select-control">
+                                                <input type="hidden" value="" id="purchaseDepartment" name="purchaseDepartment" data-msg="请选择采购部门"/>
+                                                <span class="select-txt"></span>
+                                                <i class="select-icon glyphicon glyphicon-chevron-down"></i>
+                                                <ul>
+                                                    <?php foreach($data['departmentList'] as $v){ ?>
+                                                    <li><a href="javascript:;" selectid="<?php echo $v['id'];?>"><?php echo $v['name'];?></a></li>
+                                                    <?php } ?>
+                                                </ul>
+                                            </div>                      
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group control-group">
+                                    <label class="control-label">期望交付时间</label>
+                                    <div class="controls">
+                                        <div class="control">
+                                            <div class="calender-control">
+                                                <input class="calender-data date-img" id="start" type="text" name="start" readonly data-msg="请填写采购时间">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="cpx-search-info">
+                                <div class="form-group control-group">
+                                    <label class="control-label">采购原因</label>
+                                    <div class="controls">
+                                        <div class="control">
+                                            <div class="calender-control">
+                                                <textarea id="purMsg" name="purMsg" class="purMsg" placeholder="这里填写采购原因" data-msg="请填写采购原因"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>    
+                            </div>
+                        </div>
+                    </div>
+                    <div class="cpx-table-control clearfix">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <td class="col-1">物料编码</td>
+                                    <td class="col-2">物料名称</td>
+                                    <td class="col-3">规格</td>
+                                    <td class="col-4">库存数量</td>
+                                    <td class="col-5">需求数量</td>
+                                    <td class="col-6">主单位</td>
+                                    <td class="col-61">辅单位</td>
+                                    <td class="col-7">操作</td>
+                                </tr>   
+                            </thead> 
+                            <tbody id="addMaterielList" class="addMateriel" data-msg="请添加采购种类">
+                                <?php if(isset($data['list'])){
+                                    foreach($data['list'] as $k=>$v){
+                                ?>
+
+                                <tr>
+                                    <td class="col-1"><?php echo $v['id'];?></td>
+                                    <td class="col-2"><?php echo $v['name'];?></td>
+                                    <td class="col-3"><?php echo $v['specification'];?></td>
+                                    <td class="col-4 total"><?php echo $v['surplus'];?></td>
+                                    <td class="col-5">
+                                        <input type="text" class="mount" name="mount[]" value="<?php echo $v['count'];?>">
+                                        <input type="hidden" class="id" name="id[]" value="<?php echo $v['id'];?>">
+                                        <input type="hidden" class="price" name="price[]" value="<?php echo $v['price'];?>">
+                                        <input type="hidden" class="firstCategory" name="firstCategory[]" value="<?php echo $v['categoryId'];?>">
+                                        <input type="hidden" class="unitName" name="unitName[]" value="<?php echo $v['unitName'];?>">
+                                        <input type="hidden" class="label" name="label[]" value="<?php echo $v['name'];?>">
+                                    </td>
+                                    <td class="col-6 unitName"><?php echo $v['unitName'];?></td>
+                                    <td class="col-61 tdotherunit">
+                                        <!-- 判断是否有辅单位有的话 渲染 -->
+                                        <div class="otherunit">
+                                            <input type="text" class="otherSurplus" name="otherSurplus[]">
+                                            <span>个</span>
+                                        </div>
+                                        <input type="hidden" class="otherUnitName" name="otherUnitName[]" value="">
+                                    </td>
+                                    <td class="col-7">
+                                        <button type="button" class="btn btn-default del">删除</button>
+                                    </td>
+                                </tr>
+
+                                <?php } }else{ ?>
+                                    <tr>
+                                        <td class="mQuery" colspan="3">
+                                            <div class="fq-control">
+                                                <input type="text" class="fq-query form-control fQuery" placeholder="请输入物料名称、编号、首字母">
+                                            </div>
+                                        </td>
+                                        <td class="col-4 total"></td>
+                                        <td class="col-5">
+                                            <input type="text" class="mount" name="mount[]">
+                                            <input type="hidden" class="id" name="id[]">
+                                            <input type="hidden" class="price" name="price[]">
+                                            <input type="hidden" class="firstCategory" name="firstCategory[]">
+                                            <input type="hidden" class="unitName" name="unitName[]">
+                                            <input type="hidden" class="label" name="label[]">
+                                            
+                                        </td>
+                                        <td class="col-6 unitName"></td>
+                                        <td class="col-61 tdotherunit"></td>
+                                        <td class="col-7"><button type="button" class="btn btn-default del">删除</button></td>
+                                    </tr>
+                                <?php }?>
+
+                            </tbody>   
+                        </table>
+                        <button type="button" id="addMaterielBtn" class="btn btn-default addPurDes">增加物料</button>
+                    </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="text/javascript" src="<?php echo $data['staticFileRoot']; ?>/static/lib/global/global.js?v=<?php echo $data['staticFileVer']; ?>"></script>
+    <script type="text/javascript" src="<?php echo $data['staticFileRoot']; ?>/static/lib/global/system.js?v=<?php echo $data['staticFileVer']; ?>"></script>
+    <script type="text/javascript">
+        seajs.config({
+            alias: {
+                'numeral':'temporary/numeral',
+                'laydate': 'laydate/laydate',
+                'autocomplete': 'autocomplete/autocomplete',
+                'createpurchase': window.staticFileRoot+'/static/modules/purchase/createpurchase/createpurchase'    
+            }
+        });
+        seajs.use('createpurchase', function(createpurchase) {
+            createpurchase.init();
+        });
+    </script>    
+</body>
+</html>

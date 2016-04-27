@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+	<title>厨品秀 财务办公</title>
+	<link rel="stylesheet" href="../../static/css/base.less">
+	
+	<link rel="stylesheet" href="../../widget/modules/jqgrid/grid.css">
+	<link rel="stylesheet" href="../../widget/modules/select/combo.css">
+	<link rel="stylesheet" href="../../widget/cpx_modules/warehouse/storagein.less">
+</head>
+<body>
+	<div class="wrapper">
+		<div class="mod-toolbar-top" style="position: relative; overflow: auto;">
+			<div class="bar-left cpx-form">
+				<div class="form-group control-group">
+                    <label class="control-label">查询条件</label>
+                    <div class="controls">
+                        <div class="control">
+                            <div class="calender-control">
+                                <input class="calender-data date-img" id="start" type="text" readonly="" value="2016/02/12">
+                                <span>至</span>
+                                <input class="calender-data date-img" id="end" type="text" readonly="" value="2016/02/18">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="search-control cpx-form">
+                	<input type="text" class="form-control">
+                	<button class="btn btn-primary">查询</button>
+                	<a href="javascript:;">高级查询</a>
+                </div>
+			</div>
+			<div class="bar-right">
+				<button class="btn btn-default">新建直入</button>
+				<button class="btn btn-primary">新建无成本</button>
+			</div>	
+		</div>
+		<div class="grid-wrap">
+	      	<table id="grid">
+	      	</table>
+	      	<div id="page"></div>
+	    </div>
+	</div>
+	<script src="../../widget/modules/jquery/jquery.js"></script>
+	
+	<script src="../../widget/modules/jqgrid/i18n/locale-cn.js"></script>
+	<script src="../../widget/modules/jqgrid/base.js"></script>
+	<script src="../../widget/modules/jqgrid/custom.js"></script>
+	<script src="../../widget/modules/jqgrid/fmatter.js"></script>
+	<script src="../../widget/modules/jqgrid/common.js"></script>
+	<script src="../../widget/modules/jqgrid/celledit.js"></script>
+
+	<script src="../../widget/modules/select/combo.js"></script>
+	<script type="text/javascript">
+		var colModel = [
+			{name:'operating', label:'操作', width:60, fixed:true, formatter:operFmatter, align:"center"},
+			{name:'billDate', label:'单据日期', index:'billDate', width:100, align:"center"},
+			{name:'billNo', label:'单据编号', index:'billNo', width:120, align:"center"},
+			{name:'transType', label:'业务类别', index:'transType', width:100, formatter:transFmatter, align:"center"},
+			{name:'contactName', label:'客户', index:'contactName', width:200},
+			{name:'totalAmount', label:'销售金额', index:'totalAmount', width:100, align:"right", formatter:'currency'},
+			{name:'amount', label:'折后金额', index:'amount', width:100, align:"right", formatter:'currency'},
+			{name:'rpAmount', label:'已收款金额', index:'rpAmount', width:100, align:"right", formatter:'currency'},	
+			{name:'description', label:'备注', index:'description', width:200, classes: 'ui-ellipsis'},
+			{name:'checkName', label:'审核人', index:'checkName', width:80, hidden: false, fixed:true, align:'center', title:false}
+		];		
+		$("#grid").jqGrid({
+			url: '/test/list.json',
+			postData: {},
+			datatype: "json",
+			autowidth: true,//如果为ture时，则当表格在首次被创建时会根据父元素比例重新调整表格宽度。如果父元素宽度改变，为了使表格宽度能够自动调整则需要实现函数：setGridWidth
+			height: '100%',
+			altRows: true, //设置隔行显示
+			gridview: true,
+			multiselect: true,
+			colModel: colModel,
+			cmTemplate: {sortable: false, title: false},
+			page: 1, 
+			sortname: 'number',    
+			sortorder: "desc", 
+			pager: "#page",  
+			rowNum: 100,       
+			
+			viewrecords: true,
+			shrinkToFit: false,
+			forceFit: false,
+			
+			jsonReader: {
+			  root: "data.rows", 
+			  records: "data.records", 
+			  total: "data.total", 
+			  repeatitems : false,
+			  id: "id"
+			},
+			loadComplete:  function(data) {
+				// var markLen = _self.markRow.length;
+				// if(markLen > 0) {
+				// 	for(var i = 0; i < markLen; i++) {
+				// 		$('#' + _self.markRow[i]).addClass('red');
+				// 	}
+				// }
+			},
+			loadError : function(xhr,st,err) {
+				
+			},
+			ondblClickRow : function(rowid, iRow, iCol, e){
+				//$('#' + rowid).find('.ui-icon-pencil').trigger('click');
+			}
+		});
+
+		function operFmatter (val, opt, row) {
+			var html_con = '<div class="operating" data-id="' + row.id + '"><a class="ui-icon ui-icon-pencil" title="修改"></a><a class="ui-icon ui-icon-trash" title="删除"></a></div>';
+			return html_con;
+		};
+		function transFmatter (val, opt, row) {
+			if(val === 150601) {
+				return '销货';
+			} else {
+				_self.markRow.push(row.id);
+				return '退货';
+			};
+		};
+
+	</script>
+</body>
+</html>
