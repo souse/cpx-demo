@@ -297,6 +297,33 @@ Business.publicCombo = function($_obj, opts) {
 
 	return $_obj.combo(opts).getCombo();
 };
+Business.ajaxCombo = function($_obj, opts) {
+	if ($_obj.length == 0) return;
+	var opts = $.extend(true, {
+		width: 120,
+		text: 'name',
+		value: 'id',
+		defaultSelected: -1,
+		defaultFlag: false,
+		cache: false,
+		//editable: true,
+		data: function() {
+			return parent.SYSTEM[opts.comboType]
+		},
+		ajaxOptions: {
+			formatData: function(res) {
+				parent.SYSTEM[opts.comboType] =  res.data.list;
+				return res.data.list;
+			}
+		},
+		callback: {
+			onChange: function(obj) {
+				opts.callbackfn && opts.callbackfn.call(null, obj);
+			}
+		}
+	}, opts);
+	return $_obj.combo(opts).getCombo();
+}
 //input占位符
 $.fn.placeholder = function(){
 	this.each(function() {
