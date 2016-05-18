@@ -2,175 +2,217 @@
  * 模拟select
  * @example : $('#a').combo({width: 100,callback: {onChange: function(){alert('ok')}}})
  */
-(function(t) {
-	t.fn.combo = function(e) {
-		if (this.length == 0) {
-			return this
+(function($) {
+	$.fn.combo = function(opts) {
+		if(this.length == 0) {
+			return this;
 		}
-		var i, s = arguments;
+		var returnValue, args = arguments;
 		this.each(function() {
-			var a = t(this).data("_combo");
-			if (typeof e == "string") {
-				if (!a) {
-					return
-				}
-				if (typeof a[e] === "function") {
-					s = Array.prototype.slice.call(s, 1);
-					i = a[e].apply(a, s)
-				}
-			} else {
-				if (!a) {
-					a = new t.Combo(t(this), e);
-					t(this).data("_combo", a)
+			var instance = $(this).data('_combo');
+			//如果第一个参数是String，则调用相应方法,其他参数作为方法的参数，但必须先生成实例
+			if(typeof(opts) == 'string'){
+				if(!instance){return ;}//实例未生成
+				if(typeof(instance[opts]) === 'function'){
+					args = Array.prototype.slice.call(args, 1 );
+					returnValue = instance[opts].apply(instance, args);
 				}
 			}
+			//如果参数是配置对象，则生成实例
+			else {
+				if(!instance){
+					instance = new $.Combo($(this),opts);
+					$(this).data('_combo', instance);
+				}
+			}
+
 		});
-		return i === undefined ? this : i
-	};
-	t.fn.getCombo = function() {
-		return t.Combo.getCombo(this)
-	};
-	t.Combo = function(e, i) {
-		this.obj = e;
-		this.opts = t.extend(true, {}, t.Combo.defaults, i);
+		//有返回值则返回返回值，无返回值返回调用的jQuery对象，保持jQuery链式调用
+		return returnValue === undefined ? this : returnValue;
+	}
+
+	$.fn.getCombo = function(){
+		return $.Combo.getCombo(this);
+	}
+
+
+	/**
+		CLASS : Combo
+	*/
+	$.Combo = function(obj, opts) {
+		this.obj = obj;
+		this.opts = $.extend(true, {}, $.Combo.defaults, opts);
 		this.dataOpt = this.opts.data;
 		this._selectedIndex = -1;
-		this._disabled = typeof this.opts.disabled != "undefined" ? !!this.opts.disabled : !!this.obj.attr("disabled");
-		t.extend(this, this.opts.callback);
-		this._init()
-	};
-	t.Combo.getCombo = function(e) {
-		e = t(e);
-		if (e.length == 0) {
-			return
-		} else if (e.length == 1) {
-			return e.data("_combo")
-		} else if (e.length > 1) {
-			var i = [];
-			e.each(function(e) {
-				i.push(t(this).data("_combo"))
-			});
-			return i
+		this._disabled = typeof(this.opts.disabled) != 'undefined' ? !!this.opts.disabled : !!this.obj.attr('disabled');
+		
+		//将回调直接作为实例的属性来引用，方便需要根据条件更改回调的情况
+		$.extend(this, this.opts.callback);
+
+		this._init();
+	}
+
+	/**
+		*类方法，获取combo实例
+	*/
+	$.Combo.getCombo = function(obj){
+		obj = $(obj);
+		if(obj.length == 0) {
+			return ;
+		} else if (obj.length == 1){
+			return obj.data('_combo');
+		} else if ( obj.length > 1) {
+			var objArray = [];
+			obj.each(function(idx){
+				objArray.push($(this).data('_combo'));
+			})
+			return objArray;
 		}
-	};
-	t.Combo.prototype = {
-		constructor: t.Combo,
+	}
+
+	$.Combo.prototype = {
+
+		constructor: $.Combo,
+
+		/**
+			*初始化Combo
+		*/
 		_init: function() {
-			var t = this.opts;
-			if (this.obj[0].tagName.toLowerCase() == "select") {
+			var opts = this.opts;
+			if (this.obj[0].tagName.toLowerCase() == 'select') {
 				this.originSelect = this.obj;
-				this.dataOpt = this._getDataFromSelect()
-			}
+				this.dataOpt = this._getDataFromSelect();
+			};
+
 			this._createCombo();
-			this.loadData(this.dataOpt, t.defaultSelected, t.defaultFlag);
+			this.loadData(this.dataOpt, opts.defaultSelected, opts.defaultFlag)
+
 			this._handleDisabled(this._disabled);
-			this._bindEvent()
+			this._bindEvent();
 		},
-		loadData: function(t, e, i) {
+
+
+		loadData: function(data, selected, flag){
+			var opts = this.opts;
 			if (this.xhr) {
-				this.xhr.abort()
+				this.xhr.abort();
 			}
 			this.empty(false);
-			this.dataOpt = t;
+			this.dataOpt = data;
 			this.mode = this._getRenderMode();
-			if (!this.mode) {
-				return
-			}
-			if (this.mode == "local") {
+			if(!this.mode){return ;}
+			if(this.mode == 'local'){
+				//this.rawData = data;
 				this._formatData();
-				this._populateList(this.formattedData);
-				this._setDefaultSelected(e, i)
-			} else if (this.mode == "remote") {
-				this._loadAjaxData(e, i)
+				if(opts.type !== 'search') {
+					this._populateList(this.formattedData);
+				};
+				this._setDefaultSelected(selected, flag);
+			} else if(this.mode == 'remote'){
+				this._loadAjaxData(selected, flag);
 			}
 		},
+		
 		activate: function() {
 			if (!this.focus) {
-				this.input.focus()
-			}
+				this.input.focus();
+			};
 			this.wrap.addClass(this.opts.activeCls);
-			this.active = true
+			this.active = true;	
 		},
-		_blur: function() {
+
+		_blur: function(){
 			if (!this.active) {
-				return
+				return ;
 			}
 			this.collapse();
-			if (this.opts.editable && this.opts.forceSelection) {
+			if(this.opts.editable && this.opts.forceSelection){
 				this.selectByText(this.input.val());
-				if (this._selectedIndex == -1) {
-					this.input.val("")
-				}
+				if (this._selectedIndex == -1) {this.input.val('')};
 			}
 			this.wrap.removeClass(this.opts.activeCls);
 			this.active = false;
-			if (typeof this.onBlur == "function") {
-				this.onBlur()
+			if(typeof this.onBlur == 'function'){
+				this.onBlur();
 			}
 		},
+
+		
 		blur: function() {
 			if (this.focus) {
-				this.input.blur()
+				this.input.blur();
 			}
-			this._blur()
+			this._blur();
 		},
+	
+
+		/**
+			*绑定事件
+		*/
 		_bindEvent: function() {
-			var e = this,
-				i = this.opts,
-				s = "." + i.listItemCls;
-			e.list.on("click", s, function(s) {
-				if (!t(this).hasClass(i.selectedCls)) {
-					e.selectByItem(t(this))
+			var self = this, opts = this.opts, itemSelector = '.' + opts.listItemCls;
+			self.list.on('click', itemSelector, function(e){
+				if(!$(this).hasClass(opts.selectedCls)){
+					self.selectByItem($(this));
 				}
-				e.collapse();
-				e.input.focus();
-				if (typeof e.onListClick == "function") {
-					e.onListClick()
-				}
-			}).on("mouseover", s, function(e) {
-				t(this).addClass(i.hoverCls).siblings().removeClass(i.hoverCls)
-			}).on("mouseleave", s, function(e) {
-				t(this).removeClass(i.hoverCls)
+				self.collapse();
+				self.input.focus();
+				if (typeof self.onListClick == 'function') {
+					self.onListClick();
+				};
+			}).on('mouseover', itemSelector, function(e){
+				$(this).addClass(opts.hoverCls).siblings().removeClass(opts.hoverCls);
+			}).on('mouseleave', itemSelector, function(e){
+				$(this).removeClass(opts.hoverCls);
 			});
-			e.input.on("focus", function(t) {
-				e.wrap.addClass(i.activeCls);
-				e.focus = true;
-				e.active = true
-			}).on("blur", function(t) {
-				e.focus = false
+
+			self.input.on('focus', function(e){
+				self.wrap.addClass(opts.activeCls);
+				self.focus = true;
+				self.active = true;
+			}).on('blur', function(e){
+				self.focus = false;
 			});
-			if (!i.editable) {
-				e.input.on("click", function(t) {
-					e._onTriggerClick()
-				})
+			
+			if(!opts.editable){
+				self.input.on('click', function(e){
+					self._onTriggerClick();
+				});
 			} else {
-				e.input.on("click", function(t) {
-					this.select()
-				})
+				self.input.on('click', function(e){
+					//this.select();
+				});
 			}
-			if (e.trigger) {
-				e.trigger.on("click", function(t) {
-					e._onTriggerClick()
-				})
+			
+			if(self.trigger){
+				self.trigger.on('click', function(e){
+					self._onTriggerClick();
+				});
 			}
-			t(document).on("click", function(i) {
-				var s = i.target || i.srcElement;
-				if (t(s).closest(e.wrap).length == 0 && t(s).closest(e.listWrap).length == 0) {
-					e.blur()
+
+			$(document).on('click', function(e){
+				var target  = e.target || e.srcElement;
+				if( $(target).closest(self.wrap).length == 0 && $(target).closest(self.listWrap).length == 0 ){
+					self.blur();
+					//需要判断是否在激活状态，不然每次点击document都会出发blur
 				}
 			});
-			this.listWrap.on("click", function(t) {
-				t.stopPropagation()
+
+			this.listWrap.on('click', function(e){
+				e.stopPropagation();
+				//self.wrap.trigger('click');
 			});
-			t(window).on("resize", function() {
-				e._setListPosition()
+
+			$(window).on('resize', function(){
+				self._setListPosition();
 			});
-			this._bindKeyEvent()
+
+			this._bindKeyEvent();
 		},
-		_bindKeyEvent: function() {
-			var e = this,
-				i = this.opts;
-			var s = {
+
+		_bindKeyEvent: function(){
+			var self = this, opts = this.opts;
+			var KEY = {
 				backSpace: 8,
 				esc: 27,
 				f7: 118,
@@ -183,749 +225,938 @@
 				pageUp: 33,
 				pageDown: 34,
 				space: 32
-			};
-			var a;
-			this.input.on("keydown", function(t) {
-				switch (t.keyCode) {
-					case s.tab:
-						e._blur();
-						break;
-					case s.down:
-					case s.up:
-						if (!e.isExpanded) {
-							e._onTriggerClick()
+			}
+			var isCharKey;
+
+			this.input.on('keydown', function(e){
+				switch (e.keyCode) {
+					case KEY.tab:
+						self._blur();
+						break ;
+
+					case KEY.down:
+					case KEY.up:
+						if(!self.isExpanded){
+							self._onTriggerClick();
 						} else {
-							var a = t.keyCode == s.down ? "next" : "prev";
-							e._setItemFocus(a)
+							var direction = e.keyCode == KEY.down ? 'next' : 'prev';
+							self._setItemFocus(direction);
 						}
-						t.preventDefault();
-						break;
-					case s.enter:
-						if (e.isExpanded) {
-							var l = e.list.find("." + i.hoverCls);
-							if (l.length > 0) {
-								e.selectByItem(l)
+						e.preventDefault();
+						break ;
+					
+					case KEY.enter:
+						if(self.isExpanded){
+							var item = self.list.find('.' + opts.hoverCls);
+							if(item.length > 0){
+								self.selectByItem(item);
 							}
-							e.collapse()
+							self.collapse();
 						}
-						break;
-					case s.home:
-					case s.end:
-						if (e.isExpanded) {
-							var l = t.keyCode == s.home ? e.list.find("." + i.listItemCls).eq(0) : e.list.find("." + i.listItemCls).filter(":last");
-							e._scrollToItem(l);
-							t.preventDefault()
+						break ;
+
+					case KEY.home:
+					case KEY.end:
+						if(self.isExpanded){
+							var item =  e.keyCode == KEY.home ? self.list.find('.' + opts.listItemCls).eq(0) : self.list.find('.' + opts.listItemCls).filter(':last');
+							self._scrollToItem(item);
+							e.preventDefault();
 						}
-						break;
-					case s.pageUp:
-					case s.pageDown:
-						if (e.isExpanded) {
-							var a = t.keyCode == s.pageUp ? "up" : "down";
-							e._scrollPage(a);
-							t.preventDefault()
+						break ;
+					
+					case KEY.pageUp:
+					case KEY.pageDown:
+						if(self.isExpanded){
+							var direction = e.keyCode == KEY.pageUp ? 'up' : 'down';
+							self._scrollPage(direction);
+							e.preventDefault();
 						}
-						break
+						break ;
 				}
-			}).on("keyup", function(t) {
-				if (!i.editable) {
-					return
-				}
-				var a = t.which;
-				var l = a == 8 || a == 9 || a == 13 || a == 27 || a >= 16 && a <= 20 || a >= 33 && a <= 40 || a >= 44 && a <= 46 || a >= 112 && a <= 123 || a == 144 || a == 145;
-				var n = e.input.val();
-				if (!l || a == s.backSpace) {
-					e.doDelayQuery(n)
+			}).on('keyup',function(e){
+				if(!opts.editable){return ;}
+				var k = e.which;
+			    //是否功能键
+			    //112-123 F键   16-20 16shift 17ctrl 18alt 19pause 20capsLock
+			    // 8backspace 9tab 13enter 27esc     
+			    //33-40 33home 34pageup 35end 36pagedown 37up 38left 39down 40right
+			    //44-46 44insert 45delete 46print
+			    //144 145 144numlock 145 scorllLock
+			    var isFuncKey = k == 8 || k == 9 || k == 13 || k == 27 || (k >= 16 && k <= 20) ||(k >= 33 && k <= 40) || 
+			    				(k >= 44 && k <= 46) || (k >= 112 && k <= 123) || k == 144 || k == 145;
+				var q = self.input.val();
+				if (!isFuncKey || k == KEY.backSpace) {
+					self.doDelayQuery(q);
+				};
+			});
+
+			$(document).on('keydown', function(e){
+				if(e.keyCode == KEY.esc){
+					self.collapse();
 				}
 			});
-			t(document).on("keydown", function(t) {
-				if (t.keyCode == s.esc) {
-					e.collapse()
-				}
-			})
+			
 		},
-		distory: function() {},
+
+
+
+
+		distory: function() {
+		},
+
+
 		enable: function() {
-			this._handleDisabled(false)
+			this._handleDisabled(false);
 		},
-		disable: function(t) {
-			t = typeof t == "undefined" ? true : !!t;
-			this._handleDisabled(t)
+
+		disable: function(disabled) {
+			disabled = typeof disabled == 'undefined' ? true : !!disabled; 
+			this._handleDisabled(disabled);
 		},
-		_handleDisabled: function(t) {
-			var e = this.opts;
-			this._disabled = t;
-			t == true ? this.wrap.addClass(e.disabledCls) : this.wrap.removeClass(e.disabledCls);
-			this.input.attr("disabled", t)
+
+		_handleDisabled: function(disabled){
+			var opts = this.opts;
+			this._disabled = disabled;
+			disabled == true ? this.wrap.addClass(opts.disabledCls) : this.wrap.removeClass(opts.disabledCls);
+			this.input.attr('disabled', disabled);
 		},
+		
+
+		/**
+			* 生成ComboBox
+		*/
 		_createCombo: function() {
-			var e = this.opts,
-				i = parseInt(this.opts.width),
-				s, a, l, n;
-			if (this.originSelect) {
-				this.originSelect.hide()
+			var opts = this.opts, w = parseInt(this.opts.width), wrap, input, trigger, appendFlag;
+			if(this.originSelect){
+				this.originSelect.hide();
 			}
-			if (this.obj[0].tagName.toLowerCase() == "input") {
-				this.input = this.obj
-			} else {
-				a = this.obj.find("." + e.inputCls);
-				this.input = a.length > 0 ? a : t('<input type="text" class="' + e.inputCls + '"/>')
+
+			if(this.obj[0].tagName.toLowerCase() == 'input'){
+				this.input = this.obj;
+			} else{
+				input = this.obj.find('.' + opts.inputCls);
+				this.input = input.length > 0 ? input : $('<input type="text" class="'+ opts.inputCls +'"/>');
 			}
 			this.input.attr({
-				autocomplete: "off",
-				readOnly: !e.editable
+				autocomplete: 'off',
+				readOnly: !opts.editable
 			}).css({
-				cursor: !e.editable ? "default" : ""
+				'cursor' : !opts.editable ? 'default' : ''
 			});
-			l = t(this.obj).find("." + e.triggerCls);
-			if (l.length > 0) {
-				this.trigger = l
-			} else if (e.trigger !== false) {
-				this.trigger = t('<span class="' + e.triggerCls + '"></span>')
+			
+			
+			trigger = $(this.obj).find('.' + opts.triggerCls);
+			if(trigger.length > 0){
+				this.trigger = trigger;
+			} else if(opts.trigger !== false){
+				this.trigger = $('<span class="' + opts.triggerCls + '"></span>')
 			}
-			if (this.obj.hasClass(e.wrapCls)) {
-				s = this.obj
+
+
+			if(this.obj.hasClass(opts.wrapCls)){
+				wrap = this.obj;
 			} else {
-				s = this.obj.find("." + e.wrapCls)
+				wrap = this.obj.find('.' + opts.wrapCls);
 			}
-			if (s.length > 0) {
-				this.wrap = s.append(this.input, this.trigger)
-			} else if (this.trigger) {
-				this.wrap = t('<span class="' + e.wrapCls + '"></span>').append(this.input, this.trigger);
-				if (this.originSelect && this.obj[0] == this.originSelect[0] || this.obj[0] == this.input[0]) {
-					if (this.obj.next().length > 0) {
-						this.wrap.insertBefore(this.obj.next())
+			if(wrap.length > 0){
+				this.wrap = wrap.append(this.input, this.trigger);
+			} else if(this.trigger){
+				this.wrap = $('<span class="' + opts.wrapCls + '"></span>').append(this.input, this.trigger);
+				if((this.originSelect && this.obj[0] == this.originSelect[0] ) || this.obj[0] == this.input[0]){
+					if(this.obj.next().length > 0){
+						this.wrap.insertBefore(this.obj.next());
 					} else {
-						this.wrap.appendTo(this.obj.parent())
+						this.wrap.appendTo(this.obj.parent());
 					}
 				} else {
-					this.wrap.appendTo(this.obj)
+					this.wrap.appendTo(this.obj);
 				}
 			}
-			if (this.wrap && e.id) {
-				this.wrap.attr("id", e.id)
+			if(this.wrap && opts.id){
+				this.wrap.attr('id', opts.id);
 			}
-			if (!this.wrap) {
-				this.wrap = this.input
+			if(!this.wrap){
+				this.wrap = this.input;
 			}
-			this._setComboLayout(i);
-			this.list = t("<div />").addClass(e.listCls).css({
-				position: "relative",
-				overflow: "auto"
-			});
-			this.listWrap = t("<div />").addClass(e.listWrapCls).attr("id", e.listId).hide().append(this.list).css({
-				position: "absolute",
+
+			this._setComboLayout(w);
+
+			//下拉菜单
+			
+			this.list = $('<div />').addClass(opts.listCls).css({position: 'relative', overflow: 'auto'});
+			this.listWrap = $('<div />' ).addClass(opts.listWrapCls).attr('id',opts.listId).hide().append(this.list).css({
+				position: 'absolute',
 				top: 0,
-				zIndex: e.zIndex
+				zIndex : opts.zIndex
 			});
-			if (e.extraListHtml) {
-				t("<div />").addClass(e.extraListHtmlCls).append(e.extraListHtml).appendTo(this.listWrap)
+			if (opts.extraListHtml) {
+				$('<div />').addClass(opts.extraListHtmlCls).append(opts.extraListHtml).appendTo(this.listWrap);
 			}
-			if (e.listRenderToBody) {
-				if (!t.Combo.allListWrap) {
-					t.Combo.allListWrap = t('<div id="COMBO_WRAP"/>').appendTo("body")
+			if (opts.listRenderToBody) {
+				if(!$.Combo.allListWrap) {
+					$.Combo.allListWrap = $('<div id="COMBO_WRAP"/>').appendTo('body');
 				}
-				this.listWrap.appendTo(t.Combo.allListWrap)
+				this.listWrap.appendTo($.Combo.allListWrap)
 			} else {
-				this.wrap.after(this.listWrap)
+				this.wrap.after(this.listWrap);
 			}
 		},
-		_setListLayout: function() {
-			var t = this.opts,
-				e, i = parseInt(t.listHeight),
-				s = 0,
-				a, l = this.trigger ? this.trigger.outerWidth() : 0,
-				n = parseInt(t.minListWidth),
-				r = parseInt(t.maxListWidth);
-			this.listWrap.width("auto");
-			this.list.height("auto");
-			this.listWrap.show();
+		
+
+		/**
+			* 设置下拉菜单宽高,默认自适应
+		*/
+		_setListLayout: function(){
+			var opts = this.opts, listW, listH = parseInt(opts.listHeight), diffW = 0, originListH, 
+			triggerW = this.trigger ? this.trigger.outerWidth() : 0, minListWidth = parseInt(opts.minListWidth), maxListWidth = parseInt(opts.maxListWidth);
+			//外层可能设置过宽高，重置
+			this.listWrap.width('auto');
+			this.list.height('auto');
+
+			this.listWrap.show();//为了获取list高度显示一下
 			this.isExpanded = true;
-			a = this.list.height();
-			if (!isNaN(i) && i >= 0) {
-				i = Math.min(i, a);
-				this.list.height(i)
+			originListH = this.list.height();
+
+			//设高
+			if(!isNaN(listH) && listH >= 0){
+				listH = Math.min(listH, originListH);
+				this.list.height(listH);
 			}
-			if (t.listWidth == "auto" || t.width == "auto") {
-				e = this.listWrap.outerWidth();
-				if (a < this.list.height()) {
-					s = 20;
-					e += s
+
+			if(opts.listWidth == 'auto' || opts.width == 'auto'){
+				listW = this.listWrap.outerWidth();
+				//自适应时，如有滚动条，补20滚动条宽，用高度判断是否出现滚动条
+				if(originListH < this.list.height()){
+					diffW = 20
+					listW += diffW;
 				}
 			} else {
-				e = parseInt(t.listWidth);
-				isNaN(e) ? e = this.wrap.outerWidth() : null
+				listW = parseInt(opts.listWidth)
+				isNaN(listW) ? listW = this.wrap.outerWidth() : null; 
 			}
-			if (t.width == "auto") {
-				var o = this.listWrap.outerWidth() + Math.max(l, s);
-				this._setComboLayout(o)
+
+			if (opts.width == 'auto') {
+				var comboW = this.listWrap.outerWidth() + Math.max(triggerW,diffW);
+				this._setComboLayout(comboW);
 			}
-			n = isNaN(n) ? this.wrap.outerWidth() : Math.max(n, this.wrap.outerWidth());
-			if (!isNaN(n) && e < n) {
-				e = n
+
+			//最小宽度 不能少于combo宽
+			minListWidth = isNaN(minListWidth) ? this.wrap.outerWidth() : Math.max(minListWidth, this.wrap.outerWidth());
+			if(!isNaN(minListWidth) && listW < minListWidth){
+				listW = minListWidth;
 			}
-			if (!isNaN(r) && e > r) {
-				e = r
+			//最大宽度
+			if(!isNaN(maxListWidth) && listW > maxListWidth){
+				listW = maxListWidth;
 			}
-			e = e - (this.listWrap.outerWidth() - this.listWrap.width());
-			this.listWrap.width(e);
+
+
+			listW = listW  - (this.listWrap.outerWidth() - this.listWrap.width());
+			this.listWrap.width(listW);
+
 			this.listWrap.hide();
-			this.isExpanded = false
+			this.isExpanded = false;
+
 		},
-		_setComboLayout: function(t) {
-			if (!t) {
-				return
-			}
-			var e = this.opts,
-				i = parseInt(e.maxWidth),
-				s = parseInt(e.minWidth);
-			if (!isNaN(i) && t > i) {
-				t = i
-			}
-			if (!isNaN(s) && t < s) {
-				t = s
-			}
-			var a;
-			t = t - (this.wrap.outerWidth() - this.wrap.width());
-			this.wrap.width(t);
+
+		/**
+			*w为总宽
+		*/
+		_setComboLayout: function(w){
+			if(!w){return ;}
+			var opts = this.opts, maxWidth = parseInt(opts.maxWidth), minWidth = parseInt(opts.minWidth);
+			if (!isNaN(maxWidth) && w > maxWidth) {
+				w = maxWidth;
+			};
+			if (!isNaN(minWidth) && w < minWidth) {
+				w = minWidth;
+			};
+			var inputW;
+			w = w - (this.wrap.outerWidth() - this.wrap.width());
+			this.wrap.width(w);
 			if (this.wrap[0] == this.input[0]) {
-				return
-			}
-			a = t - (this.trigger ? this.trigger.outerWidth() : 0) - (this.input.outerWidth() - this.input.width());
-			this.input.width(a)
+				return ;
+			};
+			inputW = w - (this.trigger ? this.trigger.outerWidth() : 0) - (this.input.outerWidth() - this.input.width());
+			this.input.width(inputW);
 		},
+		
+		/**
+			* 设置下拉菜单定位，根据可视区大小定位
+		*/
 		_setListPosition: function() {
-			if (!this.isExpanded) {
-				return
-			}
-			var e = this.opts,
-				i, s, a = t(window),
-				l = this.wrap.offset().top,
-				n = this.wrap.offset().left,
-				r = a.height(),
-				o = a.width(),
-				h = a.scrollTop(),
-				d = a.scrollLeft(),
-				u = this.wrap.outerHeight(),
-				f = this.wrap.outerWidth(),
-				c = this.listWrap.outerHeight(),
-				p = this.listWrap.outerWidth(),
-				m = parseInt(this.listWrap.css("border-top-width"));
-			i = l - h + u + c > r && l > c ? l - c + m : l + u - m;
-			s = n - d + p > o ? n + f - p : n;
+			if(!this.isExpanded){return ;}
+			var opts = this.opts, top, left,
+				win = $(window),
+				wrapTop = this.wrap.offset().top,
+				wrapLeft = this.wrap.offset().left,
+				winH = win.height(),
+				winW = win.width(),
+				scrollTop = win.scrollTop(),
+				scrollLeft = win.scrollLeft(),
+				wrapH = this.wrap.outerHeight(),
+				wrapW = this.wrap.outerWidth(),
+				listH = this.listWrap.outerHeight(),
+				listW = this.listWrap.outerWidth(),
+				borderW = parseInt(this.listWrap.css('border-top-width'));
+			top = (wrapTop - scrollTop + wrapH + listH) > winH && wrapTop > listH ? (wrapTop - listH + borderW) : (wrapTop + wrapH - borderW);
+			left = (wrapLeft - scrollLeft + listW) > winW ? (wrapLeft + wrapW - listW) : wrapLeft;
 			this.listWrap.css({
-				top: i,
-				left: s
-			})
+				top : top,
+				left : left
+			});
 		},
+
+		
+		/**
+			* 获取以何种方式渲染 local or remote
+		*/
 		_getRenderMode: function() {
-			var e, i = this.dataOpt;
-			if (t.isFunction(i)) {
-				i = i()
+			var mode, data = this.dataOpt;
+			if($.isFunction(data)){
+				data = data();
 			}
-			if (t.isArray(i)) {
-				this.rawData = i;
-				e = "local"
-			} else if (typeof i == "string") {
-				this.url = i;
-				e = "remote"
+			if($.isArray(data)){
+				this.rawData = data;
+				mode = 'local';
+			}else if(typeof data == 'string'){
+				this.url = data;
+				mode = 'remote';
 			}
-			return e
+			return mode;
 		},
-		_loadAjaxData: function(e, i, s) {
-			var a = this,
-				l = a.opts,
-				n = l.ajaxOptions,
-				r = t("<div />").addClass(l.loadingCls).text(n.loadingText);
-			a.list.append(r);
-			a.list.find(l.listTipsCls).remove();
-			a._setListLayout();
-			a._setListPosition();
-			a.xhr = t.ajax({
-				url: a.url,
-				type: n.type,
-				dataType: n.dataType,
-				timeout: n.timeout,
-				success: function(l) {
-					r.remove();
-					if (t.isFunction(n.success)) {
-						n.success(l)
+
+		/**
+			* 请求AJAX数据，并添加到下拉
+		*/
+		_loadAjaxData : function(selected, flag, query){
+			var self = this, opts = self.opts, ajaxOpts = opts.ajaxOptions, loading = $('<div />').addClass(opts.loadingCls).text(ajaxOpts.loadingText);
+			self.list.append(loading);
+			self.list.find(opts.listTipsCls).remove();
+			self._setListLayout();
+			self._setListPosition();
+			self.xhr = $.ajax({
+				url: self.url,
+				type: ajaxOpts.type,
+				dataType: ajaxOpts.dataType,
+				timeout: ajaxOpts.timeout,
+				success: function(data){
+					loading.remove();
+					if($.isFunction(ajaxOpts.success)){
+						ajaxOpts.success(data);
 					}
-					if (t.isFunction(n.formatData)) {
-						l = n.formatData(l)
+					if($.isFunction(ajaxOpts.formatData)){
+						data = ajaxOpts.formatData(data);
 					}
-					if (!l) {
-						return
-					}
-					a.rawData = l;
-					a._formatData();
-					a._populateList(a.formattedData);
-					if (e === "") {
-						a.lastQuery = s;
-						a.filterData = a.formattedData;
-						a.expand()
+					if(!data){return ;}
+					self.rawData = data;
+					self._formatData();
+					self._populateList(self.formattedData);
+					if(selected === '') {
+						self.lastQuery = query;
+						self.filterData = self.formattedData;
+						self.expand();
 					} else {
-						a._setDefaultSelected(e, i)
+						self._setDefaultSelected(selected, flag);
 					}
-					a.xhr = null
+					self.xhr = null;
 				},
-				error: function(e, i, s) {
-					r.remove();
-					t("<div />").addClass(l.tipsCls).text(n.errorText).appendTo(a.list);
-					a.xhr = null
+				error: function(xhr,textStatus,errorThrown){
+					loading.remove();
+					$('<div />').addClass(opts.tipsCls).text(ajaxOpts.errorText).appendTo(self.list);
+					self.xhr = null;
 				}
-			})
+			});
 		},
+		
+
+		/**
+			* 获取ComboBox的是否disabled
+		*/
 		getDisabled: function() {
-			return this._disabled
+			return this._disabled;
 		},
+
+		/**
+			* 获取ComboBox的值
+		*/
 		getValue: function() {
-			if (this._selectedIndex > -1) {
-				return this.formattedData[this._selectedIndex].value
+			if(this._selectedIndex > -1) {
+				return this.formattedData[this._selectedIndex].value;
 			} else {
 				if (this.opts.forceSelection) {
-					return ""
+					return '';
 				} else {
-					return this.input.val()
-				}
+					return this.input.val();
+				};
 			}
 		},
+		
+
+		/**
+			* 获取ComboBox的文本
+		*/
 		getText: function() {
-			if (this._selectedIndex > -1) {
-				return this.formattedData[this._selectedIndex].text
+			if(this._selectedIndex > -1) {
+				return this.formattedData[this._selectedIndex].text;
 			} else {
 				if (this.opts.forceSelection) {
-					return ""
+					return '';
 				} else {
-					return this.input.val()
-				}
+					return this.input.val();
+				};
 			}
 		},
-		getSelectedIndex: function() {
-			return this._selectedIndex
+
+		/**
+			* 获取ComboBox的selectedIndex
+		*/
+		getSelectedIndex: function(){
+			return this._selectedIndex;
 		},
-		getSelectedRow: function() {
-			if (this._selectedIndex > -1) {
-				return this.rawData[this._selectedIndex]
+
+
+		/**
+			* 获取选中数据的原始数据项 
+		*/
+		getSelectedRow: function(){
+			if(this._selectedIndex > -1){
+				return this.rawData[this._selectedIndex];
 			}
 		},
-		getDataRow: function() {
-			if (this._selectedIndex > -1) {
-				return this.rawData[this._selectedIndex]
+		
+		/**
+			* 获取选中数据的原始数据项
+		*/
+		getDataRow: function(){
+			if(this._selectedIndex > -1){
+				return this.rawData[this._selectedIndex];
 			}
 		},
-		getAllData: function() {
-			return this.formattedData
+		
+		getAllData: function(){
+			return this.formattedData;
 		},
-		getAllRawData: function() {
-			return this.rawData
+
+		getAllRawData: function(){
+			return this.rawData;
 		},
-		_setDefaultSelected: function(e, i) {
-			var s = this.opts;
-			if (typeof e == "function") {
-				defaultSelected = defaultSelected.call(this, this.rawData)
-			}
-			if (!isNaN(parseInt(e))) {
-				var a = parseInt(e);
-				this._setSelected(a, i)
-			} else if (t.isArray(e)) {
-				this.selectByKey(e[0], e[1], i)
+
+		/**
+			* 设置默认选项
+		*/
+		_setDefaultSelected: function(selected, flag){
+			var opts = this.opts;
+			if (typeof selected == 'function') {
+				defaultSelected = defaultSelected.call(this,this.rawData);
+			};
+			if(!isNaN(parseInt(selected))){
+				var selectedIndex = parseInt(selected);
+				this._setSelected(selectedIndex, flag);
+			} else if ( $.isArray(selected)) {
+				this.selectByKey(selected[0], selected[1], flag);
 			} else if (this.originSelect) {
-				var a = this.originSelect[0].selectedIndex;
-				this._setSelected(a, i)
-			} else if (s.autoSelect) {
-				this._setSelected(0, i)
-			}
+				var selectedIndex = this.originSelect[0].selectedIndex;
+				this._setSelected(selectedIndex, flag);
+			} else if (opts.autoSelect) {
+				this._setSelected(0, flag);
+			};
 		},
-		selectByIndex: function(t, e) {
-			this._setSelected(t, e)
+
+		/**
+			* 通过索引选中，flag为是否触发回调，默认为触发，下同
+		*/
+		selectByIndex: function(selectedIndex, flag){
+			this._setSelected(selectedIndex, flag);
 		},
-		selectByText: function(t, e) {
-			if (!this.formattedData) {
-				return
-			}
-			var i = this.formattedData,
-				s = -1;
-			for (var a = 0, l = i.length; a < l; a++) {
-				if (i[a].text === t) {
-					s = a;
-					break
-				}
-			}
-			this._setSelected(s, e)
+
+		/**
+			* 通过文本值选中,如值不存在selectIndex 设为 -1
+		*/
+		selectByText: function(text, flag){
+			if (!this.formattedData) {return ;}
+			var formattedData = this.formattedData, selectedIndex = -1;
+			for (var i = 0, len = formattedData.length; i < len; i++) {
+				if (formattedData[i].text === text) {
+					selectedIndex = i;
+					break ;
+				};
+			};
+			this._setSelected(selectedIndex, flag);
 		},
-		selectByValue: function(t, e) {
-			if (!this.formattedData) {
-				return
-			}
-			var i = this.formattedData,
-				s = -1;
-			for (var a = 0, l = i.length; a < l; a++) {
-				if (i[a].value === t) {
-					s = a;
-					break
-				}
-			}
-			this._setSelected(s, e)
+		
+		/**
+			* 通过值选中, 如值不存在selectIndex 设为 -1
+		*/
+		selectByValue: function(value, flag){
+			if (!this.formattedData) {return ;}
+			var formattedData = this.formattedData, selectedIndex = -1;
+			for (var i = 0, len = formattedData.length; i < len; i++) {
+				if (formattedData[i].value === value) {
+					selectedIndex = i;
+					break ;
+				};
+			};
+			this._setSelected(selectedIndex, flag);
 		},
-		selectByKey: function(t, e, i) {
-			if (!this.rawData) {
-				return
-			}
-			var s = this.rawData,
-				a, l = -1;
-			for (var n = 0, r = s.length; n < r; n++) {
-				if (s[n][t] === e) {
-					l = n;
-					break
-				}
-			}
-			this._setSelected(l, i)
+
+		/**
+			* 通过原始数据的键值选中 值必须=== 如无匹配 selectedIndex设为 -1
+		*/
+		selectByKey: function(key, value, flag){
+			if (!this.rawData) {return ;}
+/*			var rawData = this.rawData, item, selectedIndex = -1;
+			for(var i = 0, len = rawData.length; i < len; i++){
+				if (rawData[i][key] === value) {
+					selectedIndex = i;
+					break ;
+				};
+			} */
+			var self = this, opts= self.opts;
+			var rawData = this.rawData, selectedIndex = -1;
+			//修复数据变化
+			if(opts.addOptions) {
+				rawData = this.formattedData;
+				for(var i = 0, len = rawData.length; i < len; i++){
+					if (rawData[i].value === value) {
+						selectedIndex = i;
+						break ;
+					};
+				};
+			} else {
+				for(var i = 0, len = rawData.length; i < len; i++){
+					if (rawData[i][key] === value) {
+						selectedIndex = i;
+						break ;
+					};
+				} 
+			};
+			this._setSelected(selectedIndex,flag);
 		},
-		selectByItem: function(t, e) {
-			if (!t || t.parent()[0] != this.list[0]) {
-				return
-			}
-			var i = t.text();
-			this.selectByText(i, e)
+
+		/**
+			* 直接选中下拉项
+		*/
+		selectByItem: function(item, flag){
+			//无下拉项参数 或者 不是下拉项 返回
+			if (!item || item.parent()[0] != this.list[0]) {return ;}
+			var text = item.text();
+			this.selectByText(text, flag);
 		},
-		_setSelected: function(t, e) {
-			var i = this.opts,
-				t = parseInt(t);
-			var e = typeof e != "undefined" ? !!e : true;
-			if (isNaN(t)) {
-				return
-			}
+
+
+		/**
+			* 执行选中select  有beforeChange 和 onChange两个回调
+		*/
+		_setSelected: function(selectedIndex, flag){
+			var opts = this.opts , selectedIndex = parseInt(selectedIndex);
+			var  flag = typeof flag != 'undefined' ? !!flag : true;
+			if (isNaN(selectedIndex)) {return}
+
+
+			//无选项数据 返回
 			if (!this.formattedData || this.formattedData.length == 0) {
 				this._selectedIndex = -1;
-				return
+				return ;
 			}
-			var s = this.formattedData.length;
-			if (t < -1 || t >= s) {
-				t = -1
+
+			var length = this.formattedData.length;	
+			//超出数据索引范围均设为 -1
+			if (selectedIndex < -1 || selectedIndex >= length) {
+				selectedIndex = -1;
 			}
-			if (this._selectedIndex == t) {
-				return
-			}
-			var a = t == -1 ? null : this.formattedData[t];
-			var l = t == -1 ? null : a.rawData;
-			var n = t == -1 ? "" : a.text;
-			var r = this.list.find("." + i.listItemCls);
-			if (e && typeof this.beforeChange == "function") {
-				if (!this.beforeChange(l)) {
-					return
+			//与现索引相同 返回
+			if (this._selectedIndex == selectedIndex) {return ;}
+
+			var selectedData = selectedIndex == -1 ? null : this.formattedData[selectedIndex];
+			var selectedRawData = selectedIndex == -1 ? null : selectedData.rawData;
+			var text = selectedIndex == -1 ? '' : selectedData.text;
+			var listItems = this.list.find('.' + opts.listItemCls);
+			if(flag && typeof(this.beforeChange) == 'function' ){
+				//原始数据作为参数回调
+				if(!this.beforeChange(selectedRawData)){
+					return ;
 				}
 			}
-			if (t != -1) {}
-			if (!(i.editable && t == -1 && this.focus)) {
-				this.input.val(n)
+
+			
+			//改变数据选中键值
+			if (selectedIndex != -1) {
+				//selectedData.selected = true;
+				//TODO 考虑是否在这里为选中项加上 选中样式
+				//listItems.removeClass(opts.selectedCls).filter('[data-value=' + selectedData.value + ']').addClass(opts.selectedCls);
 			}
-			this._selectedIndex = t;
-			if (e && typeof this.onChange == "function") {
-				this.onChange(l)
+
+			if (!(opts.editable && selectedIndex == -1 && this.focus)) {
+				this.input.val(text);
+			};
+
+			this._selectedIndex = selectedIndex;
+			if(flag && typeof(this.onChange) == 'function'){
+				this.onChange(selectedRawData);
 			}
-			if (this.originSelect) {
-				this.originSelect[0].selectedIndex = t
+			if(this.originSelect){
+				this.originSelect[0].selectedIndex = selectedIndex;
 			}
+
 		},
-		removeSelected: function(t) {
-			this.input.val("");
-			this._setSelected(-1, t)
+
+
+		removeSelected: function(flag){
+			this.input.val('');
+			this._setSelected(-1,flag);
 		},
-		_triggerCallback: function(t, e) {},
+
+
+		/**
+			*
+		*/
+
+
+		/**
+			* 触发回调
+		*/
+		_triggerCallback: function(callback,args){
+			//if () {};
+		},
+		
+
+
+		/**
+			*从原始的select中获取数据
+		*/
 		_getDataFromSelect: function() {
-			var e = this.opts,
-				i = [];
-			t.each(this.originSelect.find("option"), function(s) {
-				var a = t(this),
-					l = {};
-				l[e.text] = a.text();
-				l[e.value] = a.attr("value");
-				i.push(l)
+			var opts = this.opts, data = [];
+			$.each(this.originSelect.find('option'), function(idx){
+				var item = $(this), dataItem = {};
+				dataItem[opts.text] = item.text();
+				dataItem[opts.value] = item.attr('value');
+				data.push(dataItem);
 			});
-			return i
+			return data;
 		},
-		_formatData: function() {
-			if (!t.isArray(this.rawData)) {
-				return
-			}
-			var e = this,
-				i = e.opts;
-			e.formattedData = [];
-			//根据业务新增
-			if (i.emptyOptions) {
-				e.formattedData.push({
-					text: "(空)",
-					value: 0
-				})
-			}
-			if (i.addOptions) {
-				e.formattedData.push(i.addOptions)
-			}
-			t.each(this.rawData, function(s, a) {
-				var l = {},
-					n, r;
-				l.text = t.isFunction(i.formatText) ? i.formatText(a) : a[i.text];
-				l.value = t.isFunction(i.formatValue) ? i.formatValue(a) : a[i.value];
-				l.rawData = a;
-				e.formattedData.push(l)
-			})
+
+		/**
+			*格式化原始数据
+		*/
+		_formatData: function(){
+			if(!$.isArray(this.rawData)){return ;}
+			var self = this, opts= self.opts;
+			self.formattedData =[];
+			if(opts.emptyOptions) {
+				self.formattedData.push({text:'(空)', value: 0});
+			};
+			if(opts.addOptions) {
+				self.formattedData.push(opts.addOptions);
+			};
+			$.each(this.rawData, function(idx, row){
+				var formattedRow = {}, value, text;
+				formattedRow.text = $.isFunction(opts.formatText) ? opts.formatText(row) : row[opts.text];
+				formattedRow.value = $.isFunction(opts.formatValue) ? opts.formatValue(row) : row[opts.value];
+				formattedRow.rawData = row;
+				self.formattedData.push(formattedRow);
+			});
 		},
-		_filter: function(e) {
-			e = typeof e == "undefined" ? "" : e;
+
+
+		/**
+			*筛选匹配的本地数据，本地数据时用，远程数据带参数load更新
+			*@ {param} {string} 匹配的字符，无参数或参数为空字符串则匹配全部数据
+		*/
+		_filter: function(query){
+			query = typeof query == 'undefined' ? '' : query;
+			//TODO 由于selectIndex改变会重复
 			if (this.input.val() != this.getText()) {
-				this.selectByText(this.input.val())
-			}
-			var i = this.opts,
-				s = this,
-				a = i.maxFilter;
-			if (!this.opts.cache) {
-				if (this.mode == "local" && t.isFunction(this.dataOpt)) {
-					this.rawData = this.dataOpt()
+				this.selectByText(this.input.val());
+			};
+			var opts = this.opts, self = this, maxFilter = opts.maxFilter;
+			if(!this.opts.cache){
+				if(this.mode == 'local' && $.isFunction(this.dataOpt)){
+					this.rawData = this.dataOpt();
 				}
-				this._formatData()
+				this._formatData();
 			}
-			if (!t.isArray(this.formattedData)) {
-				return
-			}
-			if (e == "") {
-				this.filterData = this.formattedData
+
+			if(!$.isArray(this.formattedData)){return ;}
+
+			if(query == ''){
+				this.filterData = this.formattedData;
 			} else {
 				this.filterData = [];
-				t.each(s.formattedData, function(a, l) {
-					var n = l.text;
-					if (t.isFunction(i.customMatch)) {
-						if (!i.customMatch(n, e)) {
-							return
+				$.each(self.formattedData, function(idx, item){
+					var text = item.text;
+					if($.isFunction(opts.customMatch)){
+						//console.log(opts.customMatch(text,query));
+						if(!opts.customMatch(text,query)){
+							return ;
 						}
-					} else {
-						var r = i.caseSensitive ? "" : "i";
-						var o = new RegExp(e.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&"), r);
-						if (n.search(o) == -1) {
-							return
+					} else{
+						var i = opts.caseSensitive ? '' : 'i';
+						var reg = new RegExp(query.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), i);
+						if(text.search(reg) == -1){
+							return ;
 						}
 					}
-					s.filterData.push(l);
-					if (s.filterData.length == i.maxFilter) {
-						return false
+					self.filterData.push(item);
+					if(self.filterData.length == opts.maxFilter){
+						return false;
 					}
-				})
+				});
 			}
-			this.lastQuery = e;
+			
+			this.lastQuery = query;
 			this.list.empty();
 			this._populateList(this.filterData);
-			this.expand()
+			this.expand();
 		},
-		doDelayQuery: function(t) {
-			var e = this,
-				i = e.opts,
-				s = parseInt(i.queryDelay);
-			if (isNaN(s)) {
-				s = 0
+
+
+		/**
+			*执行查询
+		*/
+		doDelayQuery: function(query){
+			var self = this, opts = self.opts, delay = parseInt(opts.queryDelay);
+			if(isNaN(delay)){
+				delay = 0;
 			}
-			if (e.queryDelay) {
-				window.clearTimeout(e.queryDelay)
+			if(self.queryDelay){
+				window.clearTimeout(self.queryDelay);
 			}
-			e.queryDelay = window.setTimeout(function() {
-				e.doQuery(t)
-			}, s)
+			self.queryDelay = window.setTimeout(function(){
+				self.doQuery(query);
+			},delay);
 		},
-		doQuery: function(t) {
-			if (this.mode == "local" || this.mode == "remote" && this.opts.loadOnce) {
-				this._filter(t)
+
+		/**
+			*执行查询
+		*/
+		doQuery: function(query){
+			if(this.mode == 'local' || (this.mode == 'remote' && this.opts.loadOnce)){
+				this._filter(query);
 			} else {
-				this._loadAjaxData("", false, t)
+				this._loadAjaxData('', false, query);
 			}
 		},
-		_populateList: function(e) {
-			if (!e) {
-				return
-			}
-			var i = this,
-				s = i.opts;
-			if (e.length == 0) {
-				if (s.forceSelection) {
-					t("<div />").addClass(s.tipsCls).html(s.noDataText).appendTo(i.list);
-					this._setListLayout()
+
+		/**
+			*根据格式化的数据生成下拉选项，并设定layout 和 position
+			*@ param {array} 格式化过的数据
+		*/
+		_populateList : function(data){
+			if(!data){return ;}
+			var self = this, opts = self.opts;
+			if(data.length == 0){
+				if(opts.forceSelection){
+					$('<div />').addClass(opts.tipsCls).html(opts.noDataText).appendTo(self.list);
+					this._setListLayout();
 				}
-			} else {
-				for (var a = 0, l = e.length; a < l; a++) {
-					var n = e[a],
-						r = n.text,
-						o = n.value;
-					t("<div />").attr({
-						"class": s.listItemCls + (a == this._selectedIndex ? " " + s.selectedCls : ""),
-						"data-value": o
-					}).text(r).appendTo(i.list)
+			} else{
+				for (var i = 0, len = data.length; i < len; i++) {
+					var item = data[i], text = item.text, value = item.value;
+					$('<div />').attr({
+						'class': opts.listItemCls + (i == this._selectedIndex ? ' ' + opts.selectedCls : ''),
+						'data-value': value
+					}).text(text).appendTo(self.list);	
 				}
-				this._setListLayout()
+				this._setListLayout();
 			}
+			//this.listItems = this.list.find('.' + opts.listItemCls);
+			//this._setListPosition();
 		},
-		expand: function() {
-			var e = this.opts;
-			if (!this.active || this.isExpanded || this.filterData.length == 0 && !e.noDataText && !e.extraListHtmlCls) {
+
+
+		/**
+			*展开下拉菜单
+		*/
+		expand: function(){
+			var opts = this.opts;
+			if(!this.active || this.isExpanded || (this.filterData.length == 0 && !opts.noDataText && !opts.extraListHtmlCls)){
 				this.listWrap.hide();
-				return
+				return ;
 			}
+
+			//if(this.isExpanded) {return ;}
 			this.isExpanded = true;
 			this.listWrap.show();
 			this._setListPosition();
-			if (t.isFunction(this.onExpand)) {
-				this.onExpand()
+			if($.isFunction(this.onExpand)){
+				this.onExpand();
 			}
-			var i = this.list.find("." + e.listItemCls);
-			if (i.length == 0) {
-				return
+			var listItems = this.list.find('.' + opts.listItemCls);
+			if( listItems.length == 0 ) {return ;}
+			var item = listItems.filter('.' + opts.selectedCls);
+			if (item.length == 0) {
+				item = listItems.eq(0).addClass(opts.hoverCls);
 			}
-			var s = i.filter("." + e.selectedCls);
-			if (s.length == 0) {
-				s = i.eq(0).addClass(e.hoverCls)
-			}
-			this._scrollToItem(s)
+			this._scrollToItem(item);
 		},
+
+		/**
+			*收起下拉菜单
+		*/
 		collapse: function() {
-			if (!this.isExpanded) {
-				return
-			}
-			var e = this.opts;
+			if(!this.isExpanded){ return ; }
+			var opts = this.opts;
 			this.listWrap.hide();
 			this.isExpanded = false;
-			if (this.listItems) {
-				this.listItems.removeClass(e.hoverCls)
+			if(this.listItems){
+				this.listItems.removeClass(opts.hoverCls);
 			}
-			if (t.isFunction(this.onCollapse)) {
-				this.onCollapse()
+			if($.isFunction(this.onCollapse)){
+				this.onCollapse();
 			}
 		},
-		_onTriggerClick: function() {
-			if (this._disabled) {
-				return
+
+		_onTriggerClick: function(){
+			if(this._disabled){
+				return ;
 			}
 			this.active = true;
 			this.input.focus();
-			if (this.isExpanded) {
-				this.collapse()
+			if(this.isExpanded){
+				this.collapse();
 			} else {
-				this._filter()
+				this._filter();
 			}
 		},
-		_scrollToItem: function(t) {
-			if (!t || t.length == 0) {
-				return
+
+
+		_scrollToItem: function(item){
+			//console.log(item);
+			if(!item || item.length == 0) {return ;}
+			var viewTop = this.list.scrollTop();
+			var itemTop = viewTop + item.position().top;
+			var viewBottom = viewTop + this.list.height();//如果listwrap 有上下padding会让可视区有差别 暂不处理，listWrap不要加上下padding
+			var itemBottom = itemTop + item.outerHeight();
+			//this.list.scrollTop(this.list.scrollTop() + itemTop);
+			//如不在可视区内，使选中项可视
+			if(itemTop < viewTop || itemBottom > viewBottom){
+				this.list.scrollTop(itemTop);
 			}
-			var e = this.list.scrollTop();
-			var i = e + t.position().top;
-			var s = e + this.list.height();
-			var a = i + t.outerHeight();
-			if (i < e || a > s) {
-				this.list.scrollTop(i)
-			}
+
 		},
-		_scrollPage: function(t) {
-			var e = this.list.scrollTop();
-			var i = this.list.height();
-			var s;
-			if (t == "up") {
-				s = e - i
-			} else if (t == "down") {
-				s = e + i
+
+		
+		_scrollPage: function(direction) {
+			var viewTop = this.list.scrollTop();
+			var viewH = this.list.height();
+			var top;
+			if(direction == 'up'){
+				top = viewTop - viewH;
+			} else if(direction == 'down'){
+				top = viewTop + viewH;
 			}
-			this.list.scrollTop(s)
+			this.list.scrollTop(top);
 		},
-		_setItemFocus: function(t) {
-			var e = this.opts,
-				i, s, a = this.list.find("." + e.listItemCls);
-			if (a.length == 0) {
-				return
-			}
-			var l = a.filter("." + e.hoverCls).eq(0);
-			if (l.length == 0) {
-				l = a.filter("." + e.selectedCls).eq(0)
-			}
-			if (l.length == 0) {
-				i = 0
+
+		/*
+			*使选项高亮，direction 为prev 或者 next
+		*/
+		_setItemFocus: function(direction){
+			var opts = this.opts, idx, item, listItems = this.list.find('.' + opts.listItemCls);
+			if (listItems.length == 0) {return ;}
+			var focusItem = listItems.filter('.' + opts.hoverCls).eq(0);
+			if (focusItem.length == 0) {
+				focusItem = listItems.filter('.' + opts.selectedCls).eq(0);
+			};
+			if (focusItem.length == 0) {
+				idx  = 0;
 			} else {
-				i = a.index(l);
-				if (t == "next") {
-					i = i == a.length - 1 ? 0 : i + 1
+				idx = listItems.index(focusItem);
+				if (direction == 'next') {
+					idx = (idx == listItems.length - 1) ? 0 : idx + 1;  
 				} else {
-					i = i == 0 ? a.length - 1 : i - 1
+					idx = idx == 0 ? listItems.length - 1 : idx - 1;
 				}
-			}
-			s = a.eq(i);
-			a.removeClass(e.hoverCls);
-			s.addClass(e.hoverCls);
-			this._scrollToItem(s)
+			};
+			item = listItems.eq(idx)
+			listItems.removeClass(opts.hoverCls);
+			item.addClass(opts.hoverCls);
+			this._scrollToItem(item);
 		},
-		empty: function(t) {
+
+		empty: function(flag){
 			this._setSelected(-1, false);
-			this.input.val("");
+			this.input.val('');
 			this.list.empty();
 			this.rawData = null;
-			this.formattedData = null
+			this.formattedData = null;
 		},
-		setEdit: function() {}
-	};
-	t.Combo.defaults = {
-		data: null,
-		text: "text",
-		value: "value",
-		formatText: null,
-		formatValue: null,
-		defaultSelected: undefined,
-		//defaultFlag: true, //初始化时是否启用回调函数
-		defaultFlag: false,
-		autoSelect: true,
+
+		//设置编辑状态
+		setEdit: function(){
+
+		}
+
+	}
+
+	$.Combo.defaults = {
+		data: null, //comboBox数据源 可为url 或者JSON，如果对象本身为select，取select的数据
+		text: 'text', //选项的文本。若为string，视为数据项的键名，取键值为文本；(未做：//若为function，function的返回为文本，该function带数据项为参数。
+		value: 'value', //选项的值。若为string，视为数据项的键名，取键值为选项的值；(未做：//若为function，function的返回为选项的值，该function带数据项为参数。
+		formatText: null, //根据数据项来格式化文本值，
+		formatValue: null, // 参上
+		defaultSelected : undefined, //默认选中的项。如为数字或转为数字的字符串，视为索引，选中该索引项；如果为数组，第一项视为Key,第二项视为value，匹配对应项
+    	defaultFlag: true,
+    	autoSelect: true,
 		disabled: undefined,
 		editable: false,
 		caseSensitive: false,
 		forceSelection: true,
-		//cache: true,
-		cache: false,
+		cache: true,
 		queryDelay: 100,
 		maxFilter: 10,
 		minChars: 0,
 		customMatch: null,
-		noDataText: "没有匹配的选项",
-		width: undefined,
+		noDataText: '没有匹配的选项',
+
+
+		width: undefined, //comboBox的总宽，默认由样式控制，如为auto根据list内容定宽
 		minWidth: undefined,
 		maxWidth: undefined,
-		listWidth: undefined,
-		listHeight: 150,
+		listWidth: undefined, //下拉菜单的总宽，默认等于等于comboBox的宽度，最小宽度等于comboBox的宽度，如为auto根据list内容定宽
+		listHeight: 150, //下拉菜单高度，超过出滚动条显示
 		maxListWidth: undefined,
 		maxListWidth: undefined,
-		zIndex: 9e3,
+		zIndex: 1000,
 		listRenderToBody: true,
 		extraListHtml: undefined,
+		//pageLength: 10, //pageUp pageDown按下时跳过的选项数
+
+		//ajax获取数据时的配置,部分与$.ajax的配置一致
 		ajaxOptions: {
-			type: "post",
-			dataType: "json",
-			queryParam: "query",
-			timeout: 1e4,
-			formatData: null,
-			loadingText: "Loading...",
+			type: 'post',
+			dataType: 'json',
+			queryParam: 'query',
+			timeout: 10000,
+			formatData: null, //对ajax返回的数据进行处理
+			loadingText: 'Loading...',
 			success: null,
 			error: null,
-			errorText: "数据加载失败"
+			errorText: '数据加载失败'
 		},
 		loadOnce: true,
+
 		id: undefined,
 		listId: undefined,
-		wrapCls: "ui-combo-wrap",
-		focusCls: "ui-combo-focus",
-		disabledCls: "ui-combo-disabled",
-		activeCls: "ui-combo-active",
-		inputCls: "input-txt",
-		triggerCls: "trigger",
-		listWrapCls: "ui-droplist-wrap",
-		listCls: "droplist",
-		listItemCls: "list-item",
-		selectedCls: "selected",
-		hoverCls: "on",
-		loadingCls: "loading",
-		tipsCls: "tips",
-		extraListHtmlCls: "extra-list-ctn",
+		wrapCls: 'ui-combo-wrap',
+		focusCls: 'ui-combo-focus',
+		disabledCls: 'ui-combo-disabled',
+		activeCls: 'ui-combo-active',
+		inputCls: 'input-txt',
+		triggerCls: 'trigger',
+		listWrapCls: 'ui-droplist-wrap',
+		listCls: 'droplist',
+		listItemCls: 'list-item',
+		selectedCls: 'selected',
+		hoverCls: 'on',
+		loadingCls: 'loading',
+		tipsCls: 'tips',
+		extraListHtmlCls: 'extra-list-ctn',
+
+		//回调的this均指向comboBox实例
 		callback: {
-			onFocus: null,
+			onFocus : null,
 			onBlur: null,
 			beforeChange: null,
 			onChange: null,
@@ -933,4 +1164,4 @@
 			onCollapse: null
 		}
 	}
-})(jQuery);
+})(jQuery)
